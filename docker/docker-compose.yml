@@ -1,0 +1,6 @@
+version: '3'
+services:
+  websockerserver:
+    image: lemanoman/websocket-server:latest
+    ports:
+      - "8080:8080"

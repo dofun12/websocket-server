@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Teste</title>
+    <style>
+        input, textarea {
+            width: 80%;
+            height: 30px;
+        }
+
+        #output {
+            overflow-y: auto;
+        }
+
+        .message-container-start {
+            padding: 0 10px;
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message-container-end {
+            padding: 0 10px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message-container-start .message-item {
+            background-color: lightgreen;
+        }
+
+        .message-container-end .message-item {
+            background-color: cornflowerblue;
+        }
+
+        .message-item {
+            border-radius: 3px;
+            padding: 10px;
+
+
+        }
+    </style>
+</head>
+<body>
+<label>Send Message</label>
+<input id="text"/>
+<button id="send-button">Send Button</button>
+<button id="dc-button">Disconnect</button>
+<hr>
+<div id="output"></div>
+<!-- <textarea rows="10" cols="2" id="output-text-area" readonly></textarea> -->
+<script>
+
+    const host = window.location.host;
+    let ws = new WebSocket(`ws://${host}/chat`);
+    let myuuid = null;
+    if(!localStorage.getItem('myuuid')){
+        myuuid = uuidv4();
+        localStorage.setItem('myuuid', myuuid);
+    }else{
+        myuuid = localStorage.getItem('myuuid');
+    }
+
+    function loadHistory(){
+        fetch(`http://${host}/api/history/`)
+            .then((response) => response.json())
+            .then((data) => {
+                for(const msg of data){
+                    handleMessage(msg);
+                }
+            });
+    }
+
+    function uuidv4() {
+        return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+            (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+        );
+    }
+
+
+    function handleMessage(message) {
+        document.getElementById('output').appendChild(createMessage(message));
+    }
+
+    function createMessage(obj) {
+        const div = document.createElement('div');
+        if (myuuid === obj.senderName) {
+            div.setAttribute('class', 'message-container-start');
+        } else {
+            div.setAttribute('class', 'message-container-end');
+        }
+
+
+        const p = document.createElement('p');
+        p.innerText = obj.message;
+        p.setAttribute('class', 'message-item');
+
+        div.appendChild(p);
+        return div;
+    }
+
+    function connect(reconnection = false) {
+        if (reconnection) {
+            ws = new WebSocket(`ws://${host}/chat`);
+        }
+
+        ws.addEventListener('open', (event) => {
+            //ws.send('Hello Server!');
+        });
+
+        // Listen for messages
+        ws.addEventListener('message', (event) => {
+            console.log('Message from server ', event.data);
+            const strMessage = event.data;
+            const objMessage = JSON.parse(strMessage);
+            if (!objMessage) {
+                return;
+            }
+            handleMessage(objMessage);
+            //document.getElementById('output-text-area').append(event.data);
+        });
+        ws.addEventListener('close', () => {
+            console.log('Reconnected');
+            connect(true);
+        });
+    }
+
+    connect();
+    loadHistory();
+
+    document.getElementById('dc-button').onclick = function (event) {
+        event.preventDefault();
+        ws.close();
+    }
+
+    document.getElementById('send-button').onclick = function (eventel) {
+        eventel.preventDefault();
+        const message = document.getElementById('text').value;
+        const senderName = myuuid;
+        const event = "message";
+        ws.send(JSON.stringify({message, senderName, event}));
+        document.getElementById('text').value = '';
+    };
+</script>
+</body>
+</html>
